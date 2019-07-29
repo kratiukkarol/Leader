@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "525400091319",
+    "firebase_url": "https://leader-70e35.firebaseio.com",
+    "project_id": "leader-70e35",
+    "storage_bucket": "leader-70e35.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:525400091319:android:64682b19c83cd338",
+        "android_client_info": {
+          "package_name": "com.kratiukkarol.leader"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "525400091319-hc255q25jbvgjuc4c29ip8pmjpa0fija.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kratiukkarol.leader",
+            "certificate_hash": "af55fe43cd988e80db085e096b2c3e554be40571"
+          }
+        },
+        {
+          "client_id": "525400091319-6uhicsqt74vjp9569jns1diqpj90dt9v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDf5SDuYz_niTKYMNoUbfws4iR8-ooaVFA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "525400091319-6uhicsqt74vjp9569jns1diqpj90dt9v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

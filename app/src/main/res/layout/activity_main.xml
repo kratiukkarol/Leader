@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:map="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/linearLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity">
+
+    <Button
+        android:id="@+id/scheduler_button"
+        android:layout_width="0dp"
+        android:layout_height="100dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="32dp"
+        android:layout_marginEnd="16dp"
+        android:text="@string/scheduler_button"
+        map:layout_constraintEnd_toEndOf="parent"
+        map:layout_constraintStart_toStartOf="parent"
+        map:layout_constraintTop_toTopOf="parent" />
+
+    <Button
+        android:id="@+id/running_button"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:text="@string/running_button"
+        map:layout_constraintBottom_toTopOf="@+id/swimming_button"
+        map:layout_constraintEnd_toStartOf="@+id/cycling_button"
+        map:layout_constraintHorizontal_bias="0.5"
+        map:layout_constraintStart_toStartOf="@+id/scheduler_button"
+        map:layout_constraintTop_toBottomOf="@+id/scheduler_button" />
+
+    <Button
+        android:id="@+id/cycling_button"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="16dp"
+        android:text="@string/cycling_button"
+        map:layout_constraintBottom_toBottomOf="@+id/running_button"
+        map:layout_constraintEnd_toEndOf="@+id/scheduler_button"
+        map:layout_constraintHorizontal_bias="0.5"
+        map:layout_constraintStart_toEndOf="@+id/running_button"
+        map:layout_constraintTop_toTopOf="@+id/running_button" />
+
+    <Button
+        android:id="@+id/swimming_button"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="32dp"
+        android:text="@string/swimming_button"
+        map:layout_constraintBottom_toBottomOf="parent"
+        map:layout_constraintEnd_toStartOf="@+id/strength_button"
+        map:layout_constraintHorizontal_bias="0.5"
+        map:layout_constraintStart_toStartOf="@+id/running_button"
+        map:layout_constraintTop_toBottomOf="@+id/running_button" />
+
+    <Button
+        android:id="@+id/strength_button"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="16dp"
+        android:text="@string/strength_button"
+        map:layout_constraintBottom_toBottomOf="@+id/swimming_button"
+        map:layout_constraintEnd_toEndOf="@+id/cycling_button"
+        map:layout_constraintHorizontal_bias="0.5"
+        map:layout_constraintStart_toEndOf="@+id/swimming_button"
+        map:layout_constraintTop_toTopOf="@+id/swimming_button" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
+
