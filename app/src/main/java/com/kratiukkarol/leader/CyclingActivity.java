@@ -1,6 +1,7 @@
 package com.kratiukkarol.leader;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
@@ -14,6 +15,9 @@ import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
+import androidx.lifecycle.ViewModelProviders;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -27,6 +31,8 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.kratiukkarol.leader.model.GeoPoint;
+import com.kratiukkarol.leader.viewModel.GeoPointViewModel;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,16 +50,16 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
     private FusedLocationProviderClient mFusedLocationProviderClient;
     private GoogleMap mGoogleMap;
     private LocationRequest locationRequest;
-    private static LatLng currentGeoPoint;
-    private List points;
-
-
+    private static GeoPoint currentGeoPoint;
+    private List<LatLng> points;
+    private GeoPointViewModel geoPointViewModel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_cycling);
-        points = new ArrayList<LatLng>();
+        points = new ArrayList<>();
+        geoPointViewModel = ViewModelProviders.of(this).get(GeoPointViewModel.class);
 
         getLocationPermission();
         if (mLocationPermissionsGranted) {
@@ -67,7 +73,6 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
     @Override
     protected void onResume() {
         super.onResume();
-        startLocationUpdates();
     }
 
     @Override
@@ -90,14 +95,17 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
         pauseButton.setOnClickListener(this);
         Button stopButton = findViewById(R.id.stop_button);
         stopButton.setOnClickListener(this);
+        Button listButton = findViewById(R.id.geo_points_list_button);
+        listButton.setOnClickListener(this);
     }
 
     @Override
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.start_button:
+                startLocationUpdates();
                 drawLine();
-                Toast.makeText(this, "Line drawing started", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Started location tracking", Toast.LENGTH_SHORT).show();
                 moveCamera(currentGeoPoint);
                 break;
             case R.id.pause_button:
@@ -106,7 +114,11 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
             case R.id.stop_button:
                 Toast.makeText(this, "Tracking stopped", Toast.LENGTH_SHORT).show();
                 mGoogleMap.clear();
-                points.clear();
+                //points.clear();
+                break;
+            case R.id.geo_points_list_button:
+                Intent geoPointsListIntent = new Intent(this, GeoPointsListActivity.class);
+                startActivity(geoPointsListIntent);
                 break;
         }
     }
@@ -120,9 +132,10 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
         mFusedLocationProviderClient.getLastLocation().addOnSuccessListener(this, location -> {
             if (location != null) {
                 Log.d(TAG, "onSuccess: current location");
-                currentGeoPoint = new LatLng(location.getLatitude(), location.getLongitude());
+                currentGeoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
                 moveCamera(currentGeoPoint);
-                points.add(currentGeoPoint);
+                geoPointViewModel.insert(currentGeoPoint);
+                points.add(new LatLng(currentGeoPoint.getLatitude(), currentGeoPoint.getLongitude()));
             } else {
                 Log.d(TAG, "onSuccess: current location is null");
                 Toast.makeText(CyclingActivity.this, "unable to get current location", Toast.LENGTH_SHORT).show();
@@ -130,9 +143,9 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
         });
     }
 
-    private void moveCamera(LatLng geoPoint) {
-        Log.d(TAG, "moveCamera: moving the camera to: lat: " + geoPoint.latitude + ", lon: " + geoPoint.longitude);
-        mGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(geoPoint, CyclingActivity.DEFAULT_ZOOM));
+    private void moveCamera(GeoPoint geoPoint) {
+        Log.d(TAG, "moveCamera: moving the camera to: lat: " + geoPoint.getLatitude() + ", lon: " + geoPoint.getLongitude());
+        mGoogleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(geoPoint.getLatitude(), geoPoint.getLongitude()), CyclingActivity.DEFAULT_ZOOM));
     }
 
     @Override
@@ -179,10 +192,11 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
                 Log.d(TAG, "onLocationResult: got location result");
                 Location location = locationResult.getLastLocation();
                 if (location != null){
-                    currentGeoPoint = new LatLng(location.getLatitude(), location.getLongitude());
-                    points.add(currentGeoPoint);
+                    currentGeoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
+                    geoPointViewModel.insert(currentGeoPoint);
+                    points.add(new LatLng(currentGeoPoint.getLatitude(), currentGeoPoint.getLongitude()));
                     Log.d(TAG, "Currently on geoPoints list are: " + points.size() + " geoPoints");
-                    Toast.makeText(CyclingActivity.this, "Latitude: " + currentGeoPoint.latitude + " Longitude: " + currentGeoPoint.longitude, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CyclingActivity.this, "Latitude: " + currentGeoPoint.getLatitude() + " Longitude: " + currentGeoPoint.getLongitude(), Toast.LENGTH_SHORT).show();
                 }
             }
         }, Looper.myLooper());

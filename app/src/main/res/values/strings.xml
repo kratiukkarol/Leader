@@ -11,6 +11,7 @@
     <string name="start_button">Start</string>
     <string name="pause_button">Pause</string>
     <string name="stop_button">Stop</string>
+    <string name="geo_points_list_button">List</string>
     <string name="title_activity_cycling">CyclingMap</string>
     <string name="title_activity_scheduler">SchedulerActivity</string>
     <string name="title_activity_strength">StrengthActivity</string>
