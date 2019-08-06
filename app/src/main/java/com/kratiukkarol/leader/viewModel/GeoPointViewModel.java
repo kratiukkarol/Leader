@@ -33,7 +33,7 @@ public class GeoPointViewModel extends AndroidViewModel {
         repository.delete(geoPoint);
     }
 
-    public void deleteAllGeoPoints(GeoPoint geoPoint){
+    public void deleteAllGeoPoints(){
         repository.deleteAllGeoPoints();
     }
 

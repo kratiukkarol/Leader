@@ -7,17 +7,18 @@ import android.graphics.Color;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.Chronometer;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
 import androidx.lifecycle.ViewModelProviders;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -53,6 +54,9 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
     private static GeoPoint currentGeoPoint;
     private List<LatLng> points;
     private GeoPointViewModel geoPointViewModel;
+    private Chronometer chronometer;
+    private long pauseOffset;
+    private boolean isChronometerRunning;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,6 +64,10 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
         setContentView(R.layout.activity_cycling);
         points = new ArrayList<>();
         geoPointViewModel = ViewModelProviders.of(this).get(GeoPointViewModel.class);
+
+        TextView distanceTextView = findViewById(R.id.distance);
+        TextView tempoTextView = findViewById(R.id.tempo);
+        chronometer = findViewById(R.id.chronometer);
 
         getLocationPermission();
         if (mLocationPermissionsGranted) {
@@ -71,10 +79,8 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
+    protected void onResume() { super.onResume();
     }
-
     @Override
     protected void onPause() {
         super.onPause();
@@ -103,23 +109,51 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.start_button:
+                startChronometer();
                 startLocationUpdates();
                 drawLine();
                 Toast.makeText(this, "Started location tracking", Toast.LENGTH_SHORT).show();
                 moveCamera(currentGeoPoint);
                 break;
             case R.id.pause_button:
+                pauseChronometer();
                 Toast.makeText(this, "Tracking paused", Toast.LENGTH_SHORT).show();
                 break;
             case R.id.stop_button:
+                stopChronometer();
                 Toast.makeText(this, "Tracking stopped", Toast.LENGTH_SHORT).show();
                 mGoogleMap.clear();
-                //points.clear();
+                points.clear();
+                geoPointViewModel.deleteAllGeoPoints();
                 break;
             case R.id.geo_points_list_button:
                 Intent geoPointsListIntent = new Intent(this, GeoPointsListActivity.class);
                 startActivity(geoPointsListIntent);
                 break;
+        }
+    }
+
+    public void startChronometer(){
+        if (!isChronometerRunning){
+            chronometer.setBase(SystemClock.elapsedRealtime() - pauseOffset);
+            chronometer.start();
+            isChronometerRunning = true;
+        }
+    }
+
+    public void pauseChronometer(){
+        if (isChronometerRunning){
+            chronometer.stop();
+            pauseOffset = SystemClock.elapsedRealtime() - chronometer.getBase();
+            isChronometerRunning = false;
+        }
+    }
+
+    public void stopChronometer(){
+        if (isChronometerRunning){
+            chronometer.stop();
+            chronometer.setBase(SystemClock.elapsedRealtime());
+            pauseOffset = 0;
         }
     }
 
