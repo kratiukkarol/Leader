@@ -57,6 +57,7 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
     private Chronometer chronometer;
     private long pauseOffset;
     private boolean isChronometerRunning;
+    private static double totalDistance;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,8 +66,16 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
         points = new ArrayList<>();
         geoPointViewModel = ViewModelProviders.of(this).get(GeoPointViewModel.class);
 
-        TextView distanceTextView = findViewById(R.id.distance);
-        TextView tempoTextView = findViewById(R.id.tempo);
+        TextView distanceTextView = findViewById(R.id.distanceCounter);
+        String distanceToDisplay = Double.toString(totalDistance);
+//        NumberFormat numberFormat = NumberFormat.getNumberInstance();
+//        numberFormat.setMinimumFractionDigits(1);
+//        numberFormat.setMaximumFractionDigits(3);
+        distanceTextView.setText(distanceToDisplay);
+
+        TextView tempoTextView = findViewById(R.id.tempoCounter);
+        tempoTextView.setText("0 km/h");
+
         chronometer = findViewById(R.id.chronometer);
 
         getLocationPermission();
@@ -125,6 +134,7 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
                 mGoogleMap.clear();
                 points.clear();
                 geoPointViewModel.deleteAllGeoPoints();
+                totalDistance = 0;
                 break;
             case R.id.geo_points_list_button:
                 Intent geoPointsListIntent = new Intent(this, GeoPointsListActivity.class);
@@ -169,7 +179,6 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
                 currentGeoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
                 moveCamera(currentGeoPoint);
                 geoPointViewModel.insert(currentGeoPoint);
-                points.add(new LatLng(currentGeoPoint.getLatitude(), currentGeoPoint.getLongitude()));
             } else {
                 Log.d(TAG, "onSuccess: current location is null");
                 Toast.makeText(CyclingActivity.this, "unable to get current location", Toast.LENGTH_SHORT).show();
@@ -229,11 +238,49 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
                     currentGeoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
                     geoPointViewModel.insert(currentGeoPoint);
                     points.add(new LatLng(currentGeoPoint.getLatitude(), currentGeoPoint.getLongitude()));
+                    calculateDistance();
                     Log.d(TAG, "Currently on geoPoints list are: " + points.size() + " geoPoints");
                     Toast.makeText(CyclingActivity.this, "Latitude: " + currentGeoPoint.getLatitude() + " Longitude: " + currentGeoPoint.getLongitude(), Toast.LENGTH_SHORT).show();
                 }
             }
         }, Looper.myLooper());
+    }
+
+    private void calculateDistance() {
+        double distance;
+
+        if (points.size()<=1){
+            return;
+        }  else
+            distance = getDistance(points.get(points.size()-2), points.get(points.size()-1));
+            totalDistance += distance;
+    }
+
+//    public void getDistance(){
+//        float[] results = new float[1];
+//        Location.distanceBetween(points.get(points.size()-2).latitude, points.get(points.size()-2).longitude, points.get(points.size()-1).latitude, points.get(points.size()-1).longitude, results);
+//    }
+
+    public double getDistance(LatLng startPoint, LatLng endPoint) {
+        final int radius = 6371; //radius of earth in Km
+        double lat1 = startPoint.latitude;
+        double lat2 = endPoint.latitude;
+        double lon1 = startPoint.longitude;
+        double lon2 = endPoint.longitude;
+        double dLat = Math.toRadians(lat2-lat1);
+        double dLon = Math.toRadians(lon2-lon1);
+        double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+        double c = 2 * Math.asin(Math.sqrt(a));
+        //        double km=valueResult/1;
+//        DecimalFormat newFormat = new DecimalFormat("####");
+//        int kmInDec =  Integer.valueOf(newFormat.format(km));
+//        double meter=valueResult%1000;
+//        int  meterInDec= Integer.valueOf(newFormat.format(meter));
+//        Log.i("Radius Value",""+valueResult+"   KM  "+kmInDec+" Meter   "+meterInDec);
+
+        return radius*c;
     }
 
     public void drawLine() {
