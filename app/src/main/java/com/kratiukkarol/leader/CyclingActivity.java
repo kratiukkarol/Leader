@@ -82,7 +82,7 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
         if (mLocationPermissionsGranted) {
             initMap();
             addButtons();
-            getCurrentLocation();
+            getInitialLocation();
             createLocationRequest();
         }
     }
@@ -110,7 +110,7 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
         pauseButton.setOnClickListener(this);
         Button stopButton = findViewById(R.id.stop_button);
         stopButton.setOnClickListener(this);
-        Button listButton = findViewById(R.id.geo_points_list_button);
+        Button listButton = findViewById(R.id.list_button);
         listButton.setOnClickListener(this);
     }
 
@@ -136,7 +136,7 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
                 geoPointViewModel.deleteAllGeoPoints();
                 totalDistance = 0;
                 break;
-            case R.id.geo_points_list_button:
+            case R.id.list_button:
                 Intent geoPointsListIntent = new Intent(this, GeoPointsListActivity.class);
                 startActivity(geoPointsListIntent);
                 break;
@@ -167,7 +167,7 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
         }
     }
 
-    public void getCurrentLocation() {
+    public void getInitialLocation() {
         Log.d(TAG, "getDeviceLocation: getting the device current location");
         if (checkSelfPermission(FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && checkSelfPermission(COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;

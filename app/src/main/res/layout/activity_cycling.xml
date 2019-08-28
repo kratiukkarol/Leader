@@ -36,7 +36,7 @@
         android:layout_marginStart="8dp"
         android:text="@string/pause_button"
         app:layout_constraintBottom_toBottomOf="@+id/stop_button"
-        app:layout_constraintEnd_toStartOf="@+id/geo_points_list_button"
+        app:layout_constraintEnd_toStartOf="@+id/list_button"
         app:layout_constraintStart_toEndOf="@+id/stop_button" />
 
     <Button
@@ -45,18 +45,18 @@
         android:layout_height="107dp"
         android:layout_marginStart="8dp"
         android:text="@string/stop_button"
-        app:layout_constraintBottom_toBottomOf="@+id/geo_points_list_button"
+        app:layout_constraintBottom_toBottomOf="@+id/list_button"
         app:layout_constraintEnd_toStartOf="@+id/pause_button"
         app:layout_constraintStart_toEndOf="@+id/start_button" />
 
     <Button
-        android:id="@+id/geo_points_list_button"
+        android:id="@+id/list_button"
         android:layout_width="0dp"
         android:layout_height="107dp"
         android:layout_marginStart="8dp"
         android:layout_marginEnd="8dp"
         android:layout_marginBottom="8dp"
-        android:text="@string/geo_points_list_button"
+        android:text="@string/list_button"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/pause_button" />
