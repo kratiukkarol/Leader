@@ -24,4 +24,8 @@ public abstract class GeoPointsDatabase extends RoomDatabase {
         }
         return instance;
     }
+
+    public static void destroyInstance(){
+        instance = null;
+    }
 }

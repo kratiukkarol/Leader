@@ -15,7 +15,7 @@
         android:theme="@style/AppTheme"
         tools:ignore="AllowBackup,GoogleAppIndexingWarning">
         <service
-            android:name=".services.RunningService"
+            android:name=".services.LocationService"
             android:stopWithTask="true"
             android:enabled="true"
             android:permission="" />

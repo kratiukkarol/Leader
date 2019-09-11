@@ -3,12 +3,14 @@ package com.kratiukkarol.leader;
 import android.Manifest;
 import android.app.ActivityManager;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.Chronometer;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -19,14 +21,14 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
-import com.kratiukkarol.leader.services.RunningService;
+import com.kratiukkarol.leader.database.GeoPointsDatabase;
+import com.kratiukkarol.leader.services.LocationService;
 
 public class RunningActivity extends AppCompatActivity implements OnMapReadyCallback, View.OnClickListener {
 
@@ -39,10 +41,20 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     private boolean mLocationPermissionsGranted = false;
     private GoogleMap mMap;
 
+    SharedPreferences preferences;
+    SharedPreferences.Editor editor;
+    private Chronometer chronometer;
+    private long pauseOffset;
+    private boolean isChronometerRunning;
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        Log.d(TAG, "onCreate: called.");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_running);
+        preferences = getSharedPreferences("preferences", MODE_PRIVATE);
+        chronometer = findViewById(R.id.chronometer);
+
         getLocationPermission();
         addButtons();
         addCounters();
@@ -96,7 +108,6 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         if (mLocationPermissionsGranted) {
             getInitialLocation();
         }
-
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
@@ -137,16 +148,23 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         stopButton.setOnClickListener(this);
         Button listButton = findViewById(R.id.list_button);
         listButton.setOnClickListener(this);
+        Log.i(TAG, "addButtons: buttons added.");
     }
 
     @Override
     public void onClick(View view) {
+        Intent locationIntent = new Intent(getApplicationContext(), LocationService.class);
         switch (view.getId()) {
             case R.id.start_button:
                 if (!isRunningServiceStarted()) {
-                    Intent startRunningIntent = new Intent(getApplicationContext(), RunningService.class);
-                    startService(startRunningIntent);
+                    startService(locationIntent);
+                    startChronometer();
                     Toast.makeText(this, "Workout started.", Toast.LENGTH_SHORT).show();
+                    // add to list or replace with database only
+                    // draw line
+                    // count distance
+                    // count currentTempo
+                    // count averageTempo
                 } else {
                     Toast.makeText(this, "Workout is already started.", Toast.LENGTH_SHORT).show();
                 }
@@ -161,8 +179,8 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 break;
             case R.id.pause_button:
                 if (isRunningServiceStarted()){
-                    Intent pauseRunningIntent = new Intent(getApplicationContext(), RunningService.class);
-                    stopService(pauseRunningIntent);
+                    stopService(locationIntent);
+                    pauseChronometer();
                     Toast.makeText(this, "Workout paused", Toast.LENGTH_SHORT).show();
                 } else {
                     Toast.makeText(this, "Workout is already paused.", Toast.LENGTH_SHORT).show();
@@ -170,16 +188,16 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 break;
             case R.id.stop_button:
                 if (isRunningServiceStarted()){
-                    Intent stopRunningIntent = new Intent(getApplicationContext(), RunningService.class);
-                    stopService(stopRunningIntent);
+                    stopService(locationIntent);
+                    stopChronometer();
                     Toast.makeText(this, "Workout stopped", Toast.LENGTH_SHORT).show();
                 } else {
-                    Toast.makeText(this, "Workout is already stopped.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Workout is not running.", Toast.LENGTH_SHORT).show();
                 }
                 break;
             case R.id.list_button:
-                //Intent geoPointsListIntent = new Intent(this, GeoPointsListActivity.class);
-                //startActivity(geoPointsListIntent);
+                Intent geoPointsListIntent = new Intent(this, GeoPointsListActivity.class);
+                startActivity(geoPointsListIntent);
                 break;
         }
     }
@@ -188,7 +206,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
         assert manager != null;
         for (ActivityManager.RunningServiceInfo serviceInfo : manager.getRunningServices(Integer.MAX_VALUE)){
-            if ("com.kratiukkarol.leader.services.RunningService".equals(serviceInfo.service.getClassName())){
+            if ("com.kratiukkarol.leader.services.LocationService".equals(serviceInfo.service.getClassName())){
                 Log.d(TAG, "isRunningServiceStarted: running service is already started.");
                 return  true;
             }
@@ -208,7 +226,60 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
         TextView tempoTextView = findViewById(R.id.tempoCounter);
         tempoTextView.setText("0 km/h");
+        Log.i(TAG, "addCounters: counters added.");
+    }
 
-        //chronometer = findViewById(R.id.chronometer);
+    public void startChronometer(){
+            chronometer.setBase(SystemClock.elapsedRealtime() - pauseOffset);
+            chronometer.start();
+            isChronometerRunning = true;
+    }
+
+    public void pauseChronometer(){
+            chronometer.stop();
+            pauseOffset = SystemClock.elapsedRealtime() - chronometer.getBase();
+            isChronometerRunning = false;
+    }
+
+    public void stopChronometer(){
+            chronometer.stop();
+            chronometer.setBase(SystemClock.elapsedRealtime());
+            pauseOffset = 0;
+            isChronometerRunning = false;
+            editor = preferences.edit();
+            editor.putLong("chronometerPauseOffset", pauseOffset);
+            editor.putLong("chronometerBaseTime", chronometer.getBase());
+            editor.apply();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        isChronometerRunning = preferences.getBoolean("isChronometerRunning", false);
+        if (isChronometerRunning){
+            pauseOffset = preferences.getLong("chronometerPauseOffset", 0);
+            chronometer.setBase(preferences.getLong("chronometerBaseTime", SystemClock.elapsedRealtime()));
+            chronometer.start();
+        } else{
+            pauseOffset = preferences.getLong("chronometerPauseOffset", 0);
+            chronometer.setBase(SystemClock.elapsedRealtime() - pauseOffset);
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        editor = preferences.edit();
+        editor.putBoolean("isChronometerRunning", isChronometerRunning);
+        editor.putLong("chronometerPauseOffset", pauseOffset);
+        editor.putLong("chronometerBaseTime", chronometer.getBase());
+        editor.apply();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.i(TAG, "onDestroy: called.");
+        GeoPointsDatabase.destroyInstance();
     }
 }

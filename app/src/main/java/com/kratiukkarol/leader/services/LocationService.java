@@ -9,38 +9,42 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
-import android.os.Looper;
-import android.util.Log;
 import android.os.Build;
 import android.os.IBinder;
-import android.widget.Toast;
+import android.os.Looper;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
+import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+import com.kratiukkarol.leader.model.GeoPoint;
+import com.kratiukkarol.leader.viewModel.GeoPointViewModel;
 
 import java.util.Objects;
 
-public class RunningService extends Service {
+public class LocationService extends Service {
 
    private static final String TAG = "LocationService";
 
    private final static long UPDATE_INTERVAL = 6000;
    private final static long FASTEST_INTERVAL = 3000;
-   //private final static float SMALLEST_DISPLACEMENT = 5f;
+   private final static float SMALLEST_DISPLACEMENT = 5f;
 
     private FusedLocationProviderClient mfusedLocationProviderClient;
     private LocationRequest mLocationRequest;
     private LocationCallback mLocationCallback;
     private Location mLocation;
+    private GeoPoint currentGeoPoint;
+    private GeoPointViewModel geoPointServiceViewModel;
 
-    public RunningService() {
+    public LocationService() {
     }
 
     @Nullable
@@ -51,13 +55,17 @@ public class RunningService extends Service {
 
     @Override
     public void onCreate() {
+        geoPointServiceViewModel = ViewModelProvider.AndroidViewModelFactory.getInstance(getApplication()).create(GeoPointViewModel.class);
         mfusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
         mLocationCallback = new LocationCallback(){
             @Override
             public void onLocationResult(LocationResult locationResult) {
                 Log.d(TAG, "onLocationResult: got location result.");
                 mLocation = locationResult.getLastLocation();
-                Toast.makeText(RunningService.this, "Latitude: " + mLocation.getLatitude() + " Longitude: " + mLocation.getLongitude(), Toast.LENGTH_SHORT).show();
+                if (mLocation != null){
+                    currentGeoPoint = new GeoPoint(mLocation.getLatitude(), mLocation.getLongitude());
+                    geoPointServiceViewModel.insert(currentGeoPoint);
+                }
             }
         };
         createLocationRequest();
@@ -82,7 +90,7 @@ public class RunningService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "onStartCommand: called.");
-        getWorkoutUpdates();
+        getLocationUpdates();
         return START_NOT_STICKY;
     }
 
@@ -91,10 +99,10 @@ public class RunningService extends Service {
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
         mLocationRequest.setInterval(UPDATE_INTERVAL);
         mLocationRequest.setFastestInterval(FASTEST_INTERVAL);
-        //locationRequest.setSmallestDisplacement(SMALLEST_DISPLACEMENT);
+        mLocationRequest.setSmallestDisplacement(SMALLEST_DISPLACEMENT);
     }
 
-    private void getWorkoutUpdates() {
+    private void getLocationUpdates() {
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED){
             Log.d(TAG, "getLocationUpdates: stopping the location service.");
@@ -103,26 +111,5 @@ public class RunningService extends Service {
         }
         Log.d(TAG, "getLocationUpdates: getting location information.");
         mfusedLocationProviderClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
-//            @Override
-//            public void onLocationResult(LocationResult locationResult) {
-//                Log.d(TAG, "onLocationResult: got location result.");
-//                Location location = locationResult.getLastLocation();
-//                if (location != null){
-                    // currentGeoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
-                    // add to database
-                    // add to list or replace with database only
-                    // draw line
-                    // count distance
-                    // count currentTempo
-                    // count averageTempo
-                    // manage chronometer
-
-//                    geoPointViewModel.insert(currentGeoPoint);
-//                    points.add(new LatLng(currentGeoPoint.getLatitude(), currentGeoPoint.getLongitude()));
-//                    calculateDistance();
-//                    Log.d(TAG, "Currently on geoPoints list are: " + points.size() + " geoPoints");
-//                    Toast.makeText(RunningService.this, "Latitude: " + location.getLatitude() + " Longitude: " + location.getLongitude(), Toast.LENGTH_SHORT).show();
-//                }
-
     }
 }

@@ -18,6 +18,8 @@ import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
+import androidx.lifecycle.LiveData;
+import androidx.lifecycle.Transformations;
 import androidx.lifecycle.ViewModelProviders;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -248,7 +250,6 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
 
     private void calculateDistance() {
         double distance;
-
         if (points.size()<=1){
             return;
         }  else
@@ -284,10 +285,17 @@ public class CyclingActivity extends FragmentActivity implements OnMapReadyCallb
     }
 
     public void drawLine() {
+
         PolylineOptions lineOptions = new PolylineOptions()
                 .color(Color.GREEN)
                 .width(5f)
                 .addAll(points);
+
+//        LiveData<List<GeoPoint>> pointsList =  geoPointViewModel.getAllGeoPoints();
+//
+//        for (GeoPoint geoPoint : points){
+//            lineOptions.add(new LatLng(geoPoint.getLatitude(), geoPoint.getLongitude()));
+//        }
 
         Polyline line = mGoogleMap.addPolyline(lineOptions);
         line.setClickable(true);
