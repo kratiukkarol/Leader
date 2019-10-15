@@ -5,6 +5,7 @@ import android.app.ActivityManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
@@ -19,6 +20,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.ViewModelProviders;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
@@ -27,8 +29,16 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.kratiukkarol.leader.database.GeoPointsDatabase;
+import com.kratiukkarol.leader.model.GeoPoint;
 import com.kratiukkarol.leader.services.LocationService;
+import com.kratiukkarol.leader.viewModel.GeoPointViewModel;
+
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.List;
 
 public class RunningActivity extends AppCompatActivity implements OnMapReadyCallback, View.OnClickListener {
 
@@ -40,6 +50,9 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
     private boolean mLocationPermissionsGranted = false;
     private GoogleMap mMap;
+    private GeoPointViewModel geoPointViewModel;
+    private static List<LatLng> pointsList = new ArrayList<>();
+    private static double totalDistance;
 
     SharedPreferences preferences;
     SharedPreferences.Editor editor;
@@ -52,6 +65,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         Log.d(TAG, "onCreate: called.");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_running);
+        geoPointViewModel = ViewModelProviders.of(this).get(GeoPointViewModel.class);
         preferences = getSharedPreferences("preferences", MODE_PRIVATE);
         chronometer = findViewById(R.id.chronometer);
 
@@ -105,7 +119,9 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         Toast.makeText(this, "Map is ready", Toast.LENGTH_SHORT).show();
         Log.d(TAG, "onMapReady: Map is ready");
         mMap = googleMap;
-        if (mLocationPermissionsGranted) {
+        if (isRunningServiceStarted()){
+            startDrawingLines();
+        } else if (mLocationPermissionsGranted) {
             getInitialLocation();
         }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -158,6 +174,7 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
             case R.id.start_button:
                 if (!isRunningServiceStarted()) {
                     startService(locationIntent);
+                    startDrawingLines();
                     startChronometer();
                     Toast.makeText(this, "Workout started.", Toast.LENGTH_SHORT).show();
                     // add to list or replace with database only
@@ -190,6 +207,8 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 if (isRunningServiceStarted()){
                     stopService(locationIntent);
                     stopChronometer();
+                    mMap.clear();
+                    pointsList.removeAll(pointsList);
                     Toast.makeText(this, "Workout stopped", Toast.LENGTH_SHORT).show();
                 } else {
                     Toast.makeText(this, "Workout is not running.", Toast.LENGTH_SHORT).show();
@@ -200,6 +219,10 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 startActivity(geoPointsListIntent);
                 break;
         }
+    }
+
+    private void startDrawingLines() {
+        geoPointViewModel.getAllGeoPoints().observe(this, (List<GeoPoint> pointList) -> drawLine());
     }
 
     private boolean isRunningServiceStarted(){
@@ -217,7 +240,8 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
     public void addCounters(){
         TextView distanceTextView = findViewById(R.id.distanceCounter);
-        distanceTextView.setText("0.00");
+        String distanceCounter = Double.toString(totalDistance);
+        distanceTextView.setText(distanceCounter);
         //String distanceToDisplay = Double.toString(totalDistance);
 //        NumberFormat numberFormat = NumberFormat.getNumberInstance();
 //        numberFormat.setMinimumFractionDigits(1);
@@ -281,5 +305,60 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         super.onDestroy();
         Log.i(TAG, "onDestroy: called.");
         GeoPointsDatabase.destroyInstance();
+    }
+
+    public void drawLine() {
+        List<GeoPoint> geoPointList = geoPointViewModel.getAllGeoPoints().getValue();
+        //LatLng newPoint = null;
+        Log.d(TAG, "drawLine: geoPointList size: " + geoPointList.size());
+        if (geoPointList != null) {
+            totalDistance = 0;
+            for (GeoPoint geoPoint : geoPointList){
+                pointsList.add(new LatLng(geoPoint.getLatitude(), geoPoint.getLongitude()));
+                calculateDistance();
+                Log.d(TAG, "drawLine: calculated distance: " + totalDistance);
+            }
+        }
+
+        PolylineOptions lineOptions = new PolylineOptions()
+                .color(Color.GREEN)
+                .width(5f)
+                .addAll(pointsList);
+
+        Polyline line = mMap.addPolyline(lineOptions);
+        line.setClickable(true);
+    }
+
+    public double getDistance(LatLng startPoint, LatLng endPoint) {
+        final int radius = 6371; //radius of earth in Km
+        double lat1 = startPoint.latitude;
+        double lat2 = endPoint.latitude;
+        double lon1 = startPoint.longitude;
+        double lon2 = endPoint.longitude;
+        double dLat = Math.toRadians(lat2-lat1);
+        double dLon = Math.toRadians(lon2-lon1);
+        double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                        Math.sin(dLon/2) * Math.sin(dLon/2);
+        double c = 2 * Math.asin(Math.sqrt(a));
+        double valueResult = radius * c;
+        double km=valueResult/1;
+        DecimalFormat newFormat = new DecimalFormat("####");
+        int kmInDec =  Integer.valueOf(newFormat.format(km));
+        double meter=valueResult%1000;
+        int  meterInDec= Integer.valueOf(newFormat.format(meter));
+        Log.i("Radius Value",""+valueResult+"   KM  "+kmInDec+" Meter   "+meterInDec);
+
+        return radius*c;
+    }
+
+    private void calculateDistance() {
+        double distance;
+        if (pointsList.size()<=1){
+            return;
+        }  else {
+            distance = getDistance(pointsList.get(pointsList.size() - 2), pointsList.get(pointsList.size() - 1));
+            totalDistance += distance;
+        }
     }
 }

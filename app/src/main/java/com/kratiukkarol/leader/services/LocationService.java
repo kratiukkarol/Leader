@@ -17,7 +17,6 @@ import android.util.Log;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
-import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -25,7 +24,7 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.kratiukkarol.leader.model.GeoPoint;
-import com.kratiukkarol.leader.viewModel.GeoPointViewModel;
+import com.kratiukkarol.leader.repository.GeoPointRepository;
 
 import java.util.Objects;
 
@@ -42,7 +41,7 @@ public class LocationService extends Service {
     private LocationCallback mLocationCallback;
     private Location mLocation;
     private GeoPoint currentGeoPoint;
-    private GeoPointViewModel geoPointServiceViewModel;
+    private GeoPointRepository geoPointRepository;
 
     public LocationService() {
     }
@@ -55,7 +54,8 @@ public class LocationService extends Service {
 
     @Override
     public void onCreate() {
-        geoPointServiceViewModel = ViewModelProvider.AndroidViewModelFactory.getInstance(getApplication()).create(GeoPointViewModel.class);
+        geoPointRepository = new GeoPointRepository(getApplication());
+        //geoPointServiceViewModel = ViewModelProvider.AndroidViewModelFactory.getInstance(getApplication()).create(GeoPointViewModel.class);
         mfusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
         mLocationCallback = new LocationCallback(){
             @Override
@@ -64,7 +64,7 @@ public class LocationService extends Service {
                 mLocation = locationResult.getLastLocation();
                 if (mLocation != null){
                     currentGeoPoint = new GeoPoint(mLocation.getLatitude(), mLocation.getLongitude());
-                    geoPointServiceViewModel.insert(currentGeoPoint);
+                    geoPointRepository.insert(currentGeoPoint);
                 }
             }
         };
@@ -85,6 +85,7 @@ public class LocationService extends Service {
     public void onDestroy() {
         super.onDestroy();
         mfusedLocationProviderClient.removeLocationUpdates(mLocationCallback);
+        geoPointRepository.deleteAllGeoPoints();
     }
 
     @Override
