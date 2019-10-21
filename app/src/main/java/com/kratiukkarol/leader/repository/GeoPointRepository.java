@@ -15,11 +15,13 @@ public class GeoPointRepository {
 
     private GeoPointDAO geoPointDAO;
     private LiveData<List<GeoPoint>> allGeoPoints;
+    private LiveData<GeoPoint> latestGeoPoint;
 
     public GeoPointRepository(Application application){
         GeoPointsDatabase database = GeoPointsDatabase.getInstance(application);
         geoPointDAO = database.geoPointDAO();
         allGeoPoints = geoPointDAO.getAllGeoPoints();
+        latestGeoPoint = geoPointDAO.getLatestGeoPoint();
     }
 
     public void insert(GeoPoint geoPoint){
@@ -40,6 +42,10 @@ public class GeoPointRepository {
 
     public LiveData<List<GeoPoint>> getAllGeoPoints(){
         return allGeoPoints;
+    }
+
+    public LiveData<GeoPoint> getLatestGeoPoint(){
+        return latestGeoPoint;
     }
 
     private static class InsertGeoPointAsyncTask extends AsyncTask<GeoPoint, Void, Void>{

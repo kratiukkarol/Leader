@@ -32,13 +32,10 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.kratiukkarol.leader.database.GeoPointsDatabase;
-import com.kratiukkarol.leader.model.GeoPoint;
 import com.kratiukkarol.leader.services.LocationService;
 import com.kratiukkarol.leader.viewModel.GeoPointViewModel;
 
 import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.List;
 
 public class RunningActivity extends AppCompatActivity implements OnMapReadyCallback, View.OnClickListener {
 
@@ -47,15 +44,18 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     private static final String COARSE_LOCATION = Manifest.permission.ACCESS_COARSE_LOCATION;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1234;
     private static final float DEFAULT_ZOOM = 15f;
+    private static final DecimalFormat distanceFormat = new DecimalFormat("##0.000");
 
     private boolean mLocationPermissionsGranted = false;
-    private GoogleMap mMap;
+    private static GoogleMap mMap;
+    private static Polyline line;
     private GeoPointViewModel geoPointViewModel;
-    private static List<LatLng> pointsList = new ArrayList<>();
-    private static double totalDistance;
+    private Intent locationIntent;
 
     SharedPreferences preferences;
     SharedPreferences.Editor editor;
+    TextView distanceTextView;
+    TextView tempoTextView;
     private Chronometer chronometer;
     private long pauseOffset;
     private boolean isChronometerRunning;
@@ -67,11 +67,12 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         setContentView(R.layout.activity_running);
         geoPointViewModel = ViewModelProviders.of(this).get(GeoPointViewModel.class);
         preferences = getSharedPreferences("preferences", MODE_PRIVATE);
+        distanceTextView = findViewById(R.id.distanceCounter);
         chronometer = findViewById(R.id.chronometer);
+        tempoTextView = findViewById(R.id.tempoCounter);
 
-        getLocationPermission();
         addButtons();
-        addCounters();
+        getLocationPermission();
     }
 
     private void getLocationPermission(){
@@ -119,13 +120,15 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         Toast.makeText(this, "Map is ready", Toast.LENGTH_SHORT).show();
         Log.d(TAG, "onMapReady: Map is ready");
         mMap = googleMap;
-        if (isRunningServiceStarted()){
-            startDrawingLines();
-        } else if (mLocationPermissionsGranted) {
+        if (mLocationPermissionsGranted && !isLocationServiceStarted()) {
             getInitialLocation();
         }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
+        }
+        if (isLocationServiceStarted()){
+            Log.d(TAG, "onStart: drawing last lines.");
+            drawLastLines();
         }
         mMap.setMyLocationEnabled(true);
     }
@@ -164,24 +167,34 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         stopButton.setOnClickListener(this);
         Button listButton = findViewById(R.id.list_button);
         listButton.setOnClickListener(this);
-        Log.i(TAG, "addButtons: buttons added.");
+        Log.d(TAG, "addButtons: buttons added.");
+    }
+
+    public void initializeLocationService(){
+        startService(locationIntent);
+    }
+
+    public void initializeMapWithService(){
+        actualizeMap();
+        startChronometer();
+        Toast.makeText(this, "Workout started.", Toast.LENGTH_SHORT).show();
+        // count currentTempo
+        // count averageTempo
     }
 
     @Override
     public void onClick(View view) {
-        Intent locationIntent = new Intent(getApplicationContext(), LocationService.class);
+        locationIntent = new Intent(getApplicationContext(), LocationService.class);
         switch (view.getId()) {
             case R.id.start_button:
-                if (!isRunningServiceStarted()) {
-                    startService(locationIntent);
-                    startDrawingLines();
-                    startChronometer();
-                    Toast.makeText(this, "Workout started.", Toast.LENGTH_SHORT).show();
-                    // add to list or replace with database only
-                    // draw line
-                    // count distance
-                    // count currentTempo
-                    // count averageTempo
+                Log.d(TAG, "onClick: start_button clicked.");
+                if (!isLocationServiceStarted()) {
+                    initializeLocationService();
+                    if (LocationService.isInitialized()){
+                        initializeMapWithService();
+                    } else {
+                        startChronometer();
+                    }
                 } else {
                     Toast.makeText(this, "Workout is already started.", Toast.LENGTH_SHORT).show();
                 }
@@ -195,7 +208,8 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 //                }
                 break;
             case R.id.pause_button:
-                if (isRunningServiceStarted()){
+                Log.d(TAG, "onClick: pause_button clicked.");
+                if (isLocationServiceStarted()){
                     stopService(locationIntent);
                     pauseChronometer();
                     Toast.makeText(this, "Workout paused", Toast.LENGTH_SHORT).show();
@@ -204,11 +218,13 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
                 }
                 break;
             case R.id.stop_button:
-                if (isRunningServiceStarted()){
+                Log.d(TAG, "onClick: stop_button clicked.");
+                if (isLocationServiceStarted()){
                     stopService(locationIntent);
                     stopChronometer();
+                    actualizeDistanceCounter();
+                    actualizeTempoCounter();
                     mMap.clear();
-                    pointsList.removeAll(pointsList);
                     Toast.makeText(this, "Workout stopped", Toast.LENGTH_SHORT).show();
                 } else {
                     Toast.makeText(this, "Workout is not running.", Toast.LENGTH_SHORT).show();
@@ -221,51 +237,74 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
         }
     }
 
-    private void startDrawingLines() {
-        geoPointViewModel.getAllGeoPoints().observe(this, (List<GeoPoint> pointList) -> drawLine());
+    private void actualizeMap() {
+        geoPointViewModel.getAllGeoPoints().observe(this, pointList -> {
+            Log.d(TAG, "actualizeMap: actualizing map...");
+            if (isLocationServiceStarted()){
+                //drawCurrentLine();
+                actualizeDistanceCounter();
+                actualizeTempoCounter();
+            } else {
+                Log.d(TAG, "actualizeMap: Nothing to actualize...");
+            }
+        });
     }
 
-    private boolean isRunningServiceStarted(){
+    private void actualizeDistanceCounter(){
+        distanceTextView = findViewById(R.id.distanceCounter);
+        double totalDistance = LocationService.getTotalDistance();
+        String distanceToDisplay = distanceFormat.format(totalDistance);
+        distanceTextView.setText(distanceToDisplay + " km");
+        Log.d(TAG, "actualizeDistanceCounter: DistanceCounter actualized: " + distanceToDisplay);
+    }
+
+    public void actualizeTempoCounter(){
+        tempoTextView = findViewById(R.id.tempoCounter);
+        tempoTextView.setText("0 km/h");
+        Log.d(TAG, "actualizeTempoCounter: TempoCounter actualized.");
+    }
+
+    public void actualizeChronometer(){
+        isChronometerRunning = preferences.getBoolean("isChronometerRunning", false);
+        if (isChronometerRunning){
+            pauseOffset = preferences.getLong("chronometerPauseOffset", 0);
+            chronometer.setBase(preferences.getLong("chronometerBaseTime", SystemClock.elapsedRealtime()));
+            chronometer.start();
+        } else {
+            pauseOffset = preferences.getLong("chronometerPauseOffset", 0);
+            chronometer.setBase(SystemClock.elapsedRealtime() - pauseOffset);
+        }
+    }
+
+    private boolean isLocationServiceStarted(){
         ActivityManager manager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
         assert manager != null;
         for (ActivityManager.RunningServiceInfo serviceInfo : manager.getRunningServices(Integer.MAX_VALUE)){
             if ("com.kratiukkarol.leader.services.LocationService".equals(serviceInfo.service.getClassName())){
-                Log.d(TAG, "isRunningServiceStarted: running service is already started.");
+                Log.d(TAG, "isLocationServiceStarted: location service is already started.");
                 return  true;
             }
         }
-        Log.d(TAG, "isRunningServiceStarted: running service is not running.");
+        Log.d(TAG, "isLocationServiceStarted: location service is not started.");
         return false;
     }
 
-    public void addCounters(){
-        TextView distanceTextView = findViewById(R.id.distanceCounter);
-        String distanceCounter = Double.toString(totalDistance);
-        distanceTextView.setText(distanceCounter);
-        //String distanceToDisplay = Double.toString(totalDistance);
-//        NumberFormat numberFormat = NumberFormat.getNumberInstance();
-//        numberFormat.setMinimumFractionDigits(1);
-//        numberFormat.setMaximumFractionDigits(3);
-        //distanceTextView.setText(distanceToDisplay);
-
-        TextView tempoTextView = findViewById(R.id.tempoCounter);
-        tempoTextView.setText("0 km/h");
-        Log.i(TAG, "addCounters: counters added.");
-    }
-
     public void startChronometer(){
+        Log.d(TAG, "startChronometer: chronometer started.");
             chronometer.setBase(SystemClock.elapsedRealtime() - pauseOffset);
             chronometer.start();
             isChronometerRunning = true;
     }
 
     public void pauseChronometer(){
+        Log.d(TAG, "pauseChronometer: chronometer paused.");
             chronometer.stop();
             pauseOffset = SystemClock.elapsedRealtime() - chronometer.getBase();
             isChronometerRunning = false;
     }
 
     public void stopChronometer(){
+        Log.d(TAG, "stopChronometer: chronometer stopped.");
             chronometer.stop();
             chronometer.setBase(SystemClock.elapsedRealtime());
             pauseOffset = 0;
@@ -278,20 +317,18 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
 
     @Override
     protected void onStart() {
+
+        Log.d(TAG, "onStart: called.");
         super.onStart();
-        isChronometerRunning = preferences.getBoolean("isChronometerRunning", false);
-        if (isChronometerRunning){
-            pauseOffset = preferences.getLong("chronometerPauseOffset", 0);
-            chronometer.setBase(preferences.getLong("chronometerBaseTime", SystemClock.elapsedRealtime()));
-            chronometer.start();
-        } else{
-            pauseOffset = preferences.getLong("chronometerPauseOffset", 0);
-            chronometer.setBase(SystemClock.elapsedRealtime() - pauseOffset);
-        }
+        actualizeDistanceCounter();
+        actualizeChronometer();
+        actualizeTempoCounter();
+        actualizeMap();
     }
 
     @Override
     protected void onStop() {
+        Log.d(TAG, "onStop: called.");
         super.onStop();
         editor = preferences.edit();
         editor.putBoolean("isChronometerRunning", isChronometerRunning);
@@ -304,61 +341,40 @@ public class RunningActivity extends AppCompatActivity implements OnMapReadyCall
     protected void onDestroy() {
         super.onDestroy();
         Log.i(TAG, "onDestroy: called.");
+        geoPointViewModel.getAllGeoPoints().removeObservers(this);
         GeoPointsDatabase.destroyInstance();
     }
 
-    public void drawLine() {
-        List<GeoPoint> geoPointList = geoPointViewModel.getAllGeoPoints().getValue();
-        //LatLng newPoint = null;
-        Log.d(TAG, "drawLine: geoPointList size: " + geoPointList.size());
-        if (geoPointList != null) {
-            totalDistance = 0;
-            for (GeoPoint geoPoint : geoPointList){
-                pointsList.add(new LatLng(geoPoint.getLatitude(), geoPoint.getLongitude()));
-                calculateDistance();
-                Log.d(TAG, "drawLine: calculated distance: " + totalDistance);
-            }
+    public void drawLastLines() {
+        if (LocationService.getPointsList().size() >= 2){
+            Log.d(TAG, "drawLastLines: drawing last lines...");
+            PolylineOptions lastLines = new PolylineOptions()
+                    .color(Color.GREEN)
+                    .width(5f)
+                    .addAll(LocationService.getPointsList());
+
+            line = mMap.addPolyline(lastLines);
+            line.setClickable(true);
+        } else {
+            Log.d(TAG, "drawLastLines: The points list does not contain two elements.");
         }
-
-        PolylineOptions lineOptions = new PolylineOptions()
-                .color(Color.GREEN)
-                .width(5f)
-                .addAll(pointsList);
-
-        Polyline line = mMap.addPolyline(lineOptions);
-        line.setClickable(true);
     }
 
-    public double getDistance(LatLng startPoint, LatLng endPoint) {
-        final int radius = 6371; //radius of earth in Km
-        double lat1 = startPoint.latitude;
-        double lat2 = endPoint.latitude;
-        double lon1 = startPoint.longitude;
-        double lon2 = endPoint.longitude;
-        double dLat = Math.toRadians(lat2-lat1);
-        double dLon = Math.toRadians(lon2-lon1);
-        double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
-                        Math.sin(dLon/2) * Math.sin(dLon/2);
-        double c = 2 * Math.asin(Math.sqrt(a));
-        double valueResult = radius * c;
-        double km=valueResult/1;
-        DecimalFormat newFormat = new DecimalFormat("####");
-        int kmInDec =  Integer.valueOf(newFormat.format(km));
-        double meter=valueResult%1000;
-        int  meterInDec= Integer.valueOf(newFormat.format(meter));
-        Log.i("Radius Value",""+valueResult+"   KM  "+kmInDec+" Meter   "+meterInDec);
+    public static void drawCurrentLine(){
+        if (LocationService.getPointsList().size() >= 2){
+            Log.d(TAG, "drawCurrentLine: drawing current line...");
+            Log.d(TAG, "drawCurrentLine: Points list size: " + LocationService.getPointsList().size());
+            PolylineOptions latestLine = new PolylineOptions()
+                    .color(Color.BLUE)
+                    .width(5f)
+                    .add(LocationService.getPointsList().get(LocationService.getPointsList().size() - 2),
+                            LocationService.getPointsList().get(LocationService.getPointsList().size() - 1));
 
-        return radius*c;
-    }
-
-    private void calculateDistance() {
-        double distance;
-        if (pointsList.size()<=1){
-            return;
-        }  else {
-            distance = getDistance(pointsList.get(pointsList.size() - 2), pointsList.get(pointsList.size() - 1));
-            totalDistance += distance;
+            line = mMap.addPolyline(latestLine);
+            Log.d(TAG, "drawCurrentLine: The line has been drawn on the map.");
+            line.setClickable(true);
+        } else {
+            Log.d(TAG, "drawCurrentLine: The points list does not contain two elements.");
         }
     }
 }

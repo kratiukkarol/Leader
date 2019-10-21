@@ -28,4 +28,7 @@ public interface GeoPointDAO {
 
     @Query("SELECT * FROM geo_points")
     LiveData<List<GeoPoint>> getAllGeoPoints();
+
+    @Query("SELECT * FROM geo_points ORDER BY id DESC LIMIT 1")
+    LiveData<GeoPoint> getLatestGeoPoint();
 }
